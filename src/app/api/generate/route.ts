@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { processVideoTask, getStatusMessage } from "@/lib/mockQueue";
 import { runReplicateVideoAnimation } from "@/lib/replicateEngine";
+import { runHuggingFaceVideoAnimation } from "@/lib/huggingFaceEngine";
 import { writeFile } from "fs/promises";
 import path from "path";
 
@@ -21,13 +22,20 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const prompt = (formData.get("prompt") as string | null)?.trim() || "";
-    const engineMode = (formData.get("engine") as string | null) || "replicate"; // 'replicate' | 'ffmpeg'
+    // Default to 'huggingface' for free AI animation
+    const engineMode = (formData.get("engine") as string | null) || "huggingface";
 
-    // Get API token from header or form data
+    // Replicate token
     const clientToken =
       req.headers.get("x-replicate-token") ||
       (formData.get("apiToken") as string | null)?.trim();
-    const resolvedToken = clientToken || process.env.REPLICATE_API_TOKEN?.trim();
+    const resolvedReplicateToken = clientToken || process.env.REPLICATE_API_TOKEN?.trim();
+
+    // HuggingFace token (optional)
+    const clientHfToken =
+      req.headers.get("x-hf-token") ||
+      (formData.get("hfToken") as string | null)?.trim();
+    const resolvedHfToken = clientHfToken || process.env.HF_TOKEN?.trim();
 
     // 1. Validation
     if (!file) {
@@ -67,13 +75,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if Replicate mode is requested but no token is found
-    if (engineMode === "replicate" && !resolvedToken) {
+    if (engineMode === "replicate" && !resolvedReplicateToken) {
       return NextResponse.json(
         {
           success: false,
           error:
-            "مفتاح Replicate API Token مطلوب للتحريك الحقيقي بالذكاء الاصطناعي. يرجى إدخال المفتاح عبر زر الإعدادات في الأعلى، أو الحصول على مفتاح مجاني من replicate.com/account/api-tokens.",
+            "مفتاح Replicate API Token مطلوب عند اختيار محرك Replicate. يمكنك التبديل إلى محرك Hugging Face المجاني 100%.",
         },
         { status: 400 }
       );
@@ -101,12 +108,15 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 4. Trigger appropriate engine
-    if (engineMode === "replicate" && resolvedToken) {
-      // True Generative AI Motion via Cloud GPU
-      runReplicateVideoAnimation(task.id, resolvedToken);
+    // 4. Trigger selected engine
+    if (engineMode === "huggingface") {
+      // 100% Free ZeroGPU SVD AI Video Generation
+      runHuggingFaceVideoAnimation(task.id, resolvedHfToken);
+    } else if (engineMode === "replicate" && resolvedReplicateToken) {
+      // Replicate GPU
+      runReplicateVideoAnimation(task.id, resolvedReplicateToken);
     } else {
-      // Fallback: Local FFmpeg camera motion
+      // Local FFmpeg Camera Pan
       processVideoTask(task.id);
     }
 
