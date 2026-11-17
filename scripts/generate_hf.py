@@ -18,7 +18,9 @@ try:
     from gradio_client import Client, handle_file
 
     if hf_token:
-        client = Client("mediasynthesismuseum/stable-video-diffusion", hf_token=hf_token)
+        os.environ["HF_TOKEN"] = hf_token
+        os.environ["HUGGING_FACE_HUB_TOKEN"] = hf_token
+        client = Client("mediasynthesismuseum/stable-video-diffusion", token=hf_token)
     else:
         client = Client("mediasynthesismuseum/stable-video-diffusion")
 
