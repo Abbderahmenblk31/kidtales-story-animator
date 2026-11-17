@@ -63,6 +63,9 @@ export async function runHuggingFaceVideoAnimation(
             if (!line.trim()) continue;
             try {
               const parsed = JSON.parse(line.trim());
+              if (parsed.error) {
+                lastError = parsed.error;
+              }
               if (parsed.progress) {
                 await prisma.videoTask.update({
                   where: { id: taskId },
@@ -112,12 +115,18 @@ export async function runHuggingFaceVideoAnimation(
       const message =
         err instanceof Error ? err.message : "فشل التوليد عبر Hugging Face، يرجى المحاولة لاحقاً";
 
+      let userFriendlyMessage = message;
+      if (typeof message === "string" && message.includes("exceeded your ZeroGPU quota")) {
+        userFriendlyMessage =
+          "تم استهلاك الحصة المجانية المؤقتة لعنوان IP الحالي على ZeroGPU. يمكنك إنشاء حساب مجاني في 10 ثوانٍ على huggingface.co وجلب مفتاح Access Token مجاني من (huggingface.co/settings/tokens) ووضعه في الإعدادات لتفعيل حصتك المجانية الخاصة فوراً وبدون أي دفع.";
+      }
+
       try {
         await prisma.videoTask.update({
           where: { id: taskId },
           data: {
             status: "FAILED",
-            errorMessage: message,
+            errorMessage: userFriendlyMessage,
           },
         });
       } catch (innerErr) {

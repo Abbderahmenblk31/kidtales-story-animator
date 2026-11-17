@@ -16,28 +16,29 @@ export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [prompt, setPrompt] = useState<string>("");
   const [engineMode, setEngineMode] = useState<"huggingface" | "replicate" | "ffmpeg">("huggingface");
-  const [apiToken, setApiToken] = useState<string>("");
+  const [hfToken, setHfToken] = useState<string>("");
+  const [replicateToken, setReplicateToken] = useState<string>("");
   const [isKeyModalOpen, setIsKeyModalOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
   const [historyCount, setHistoryCount] = useState<number>(0);
 
-  // Load API token from localStorage on mount
+  // Load tokens from localStorage
   useEffect(() => {
-    const savedToken = localStorage.getItem("replicate_api_token");
-    if (savedToken) {
-      setApiToken(savedToken);
-    }
+    const savedHf = localStorage.getItem("hf_api_token");
+    const savedReplicate = localStorage.getItem("replicate_api_token");
+    if (savedHf) setHfToken(savedHf);
+    if (savedReplicate) setReplicateToken(savedReplicate);
   }, []);
 
-  const handleSaveToken = (token: string) => {
-    setApiToken(token);
-    if (token) {
-      localStorage.setItem("replicate_api_token", token);
-    } else {
-      localStorage.removeItem("replicate_api_token");
-    }
+  const handleSaveTokens = (hf: string, replicate: string) => {
+    setHfToken(hf);
+    setReplicateToken(replicate);
+    if (hf) localStorage.setItem("hf_api_token", hf);
+    else localStorage.removeItem("hf_api_token");
+    if (replicate) localStorage.setItem("replicate_api_token", replicate);
+    else localStorage.removeItem("replicate_api_token");
   };
 
   // Hook for 3-second real-time polling
@@ -78,7 +79,7 @@ export default function Home() {
       return;
     }
 
-    if (engineMode === "replicate" && !apiToken.trim()) {
+    if (engineMode === "replicate" && !replicateToken.trim()) {
       setIsKeyModalOpen(true);
       setSubmitError("يرجى إدخال مفتاح Replicate أولاً أو التبديل لمحرك Hugging Face المجاني.");
       return;
@@ -91,14 +92,14 @@ export default function Home() {
       formData.append("file", selectedFile);
       formData.append("prompt", prompt.trim());
       formData.append("engine", engineMode);
-      if (apiToken) {
-        formData.append("apiToken", apiToken.trim());
-      }
+      if (replicateToken) formData.append("apiToken", replicateToken.trim());
+      if (hfToken) formData.append("hfToken", hfToken.trim());
 
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: {
-          ...(apiToken ? { "x-replicate-token": apiToken.trim() } : {}),
+          ...(replicateToken ? { "x-replicate-token": replicateToken.trim() } : {}),
+          ...(hfToken ? { "x-hf-token": hfToken.trim() } : {}),
         },
         body: formData,
       });
@@ -109,7 +110,6 @@ export default function Home() {
         throw new Error(data.error || "فشل إرسال طلب التحريك.");
       }
 
-      // Start 3-second polling on the newly created task
       startPolling(data.task.id, data.task);
     } catch (err: unknown) {
       console.error("Submission failed:", err);
@@ -142,7 +142,7 @@ export default function Home() {
       <Header
         onToggleGallery={() => setIsGalleryOpen(true)}
         onOpenKeyModal={() => setIsKeyModalOpen(true)}
-        hasApiKey={Boolean(apiToken.trim())}
+        hasApiKey={Boolean(hfToken.trim() || replicateToken.trim())}
         historyCount={historyCount}
       />
 
@@ -304,11 +304,22 @@ export default function Home() {
               </div>
 
               {engineMode === "huggingface" && (
-                <div className="mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-2 text-xs text-emerald-800">
-                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    الوضع مفعل: سيتم إرسال الرسمة إلى خوادم Hugging Face ZeroGPU لتوليد حركة حقيقية مجاناً 100%!
-                  </span>
+                <div className="mt-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between text-xs text-emerald-800">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      {hfToken
+                        ? "المفتاح المجاني مفعل: سيتم التوليد بأعلى أولوية عبر ZeroGPU."
+                        : "وضع ZeroGPU المجاني. يمكنك وضع مفتاح مجاني لزيادة الحصة وتجنب الانتظار."}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsKeyModalOpen(true)}
+                    className="font-black underline text-emerald-900 shrink-0 ml-2"
+                  >
+                    {hfToken ? "تعديل المفتاح" : "إضافة مفتاح مجاني"}
+                  </button>
                 </div>
               )}
             </div>
@@ -365,10 +376,16 @@ export default function Home() {
             <h3 className="text-xl font-black text-slate-800">
               عذراً، حدث خطأ أثناء المعالجة
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
               {task.errorMessage || "لم نتمكن من معالجة المشهد، يرجى المحاولة مرة أخرى."}
             </p>
-            <div className="flex justify-center gap-3">
+            <div className="flex justify-center gap-3 pt-2">
+              <button
+                onClick={() => setIsKeyModalOpen(true)}
+                className="px-5 py-2.5 rounded-xl border border-purple-200 text-purple-700 text-xs font-bold hover:bg-purple-50"
+              >
+                إعداد مفاتيح الذكاء الاصطناعي
+              </button>
               <button
                 onClick={handleReset}
                 className="px-6 py-2.5 rounded-xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition-all"
@@ -399,8 +416,9 @@ export default function Home() {
       <ApiKeyModal
         isOpen={isKeyModalOpen}
         onClose={() => setIsKeyModalOpen(false)}
-        apiKey={apiToken}
-        onSaveKey={handleSaveToken}
+        hfToken={hfToken}
+        replicateToken={replicateToken}
+        onSaveTokens={handleSaveTokens}
       />
     </div>
   );
