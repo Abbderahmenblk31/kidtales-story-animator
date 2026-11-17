@@ -40,11 +40,15 @@ export async function GET(
     const fileSize = stat.size;
     const ext = path.extname(fullPath).toLowerCase();
     const contentType = MIME_TYPES[ext] || "application/octet-stream";
+    const isDownload =
+      req.nextUrl?.searchParams?.get("download") === "true" ||
+      (req.url ? new URL(req.url).searchParams.get("download") === "true" : false);
+    const filename = path.basename(fullPath);
 
     // Handle HTTP Range header for video streaming/seeking (HTTP 206 Partial Content)
     const range = req.headers.get("range");
 
-    if (range && contentType.startsWith("video/")) {
+    if (range && contentType.startsWith("video/") && !isDownload) {
       const parts = range.replace(/bytes=/, "").split("-");
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
@@ -82,7 +86,7 @@ export async function GET(
       });
     }
 
-    // Full file response (Images and non-range video requests)
+    // Full file response (Images, downloads, and non-range video requests)
     const nodeStream = fs.createReadStream(fullPath);
     const webStream = new ReadableStream({
       start(controller) {
@@ -95,15 +99,17 @@ export async function GET(
       },
     });
 
-    return new NextResponse(webStream, {
-      status: 200,
-      headers: {
-        "Content-Length": fileSize.toString(),
-        "Content-Type": contentType,
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "public, max-age=3600",
-      },
-    });
+    const response = new NextResponse(webStream, { status: 200 });
+    response.headers.set("Content-Length", fileSize.toString());
+    response.headers.set("Content-Type", contentType);
+    response.headers.set("Accept-Ranges", "bytes");
+    response.headers.set("Cache-Control", "public, max-age=3600");
+
+    if (isDownload) {
+      response.headers.set("Content-Disposition", `attachment; filename="${filename}"`);
+    }
+
+    return response;
   } catch (error) {
     console.error("[Uploads Route] Error serving file:", error);
     return new NextResponse("Internal Server Error", { status: 500 });

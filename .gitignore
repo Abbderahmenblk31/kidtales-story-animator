@@ -39,6 +39,10 @@ prisma/*.db-journal
 *.db
 *.db-journal
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Uploaded runtime user media
 public/uploads/*
 !public/uploads/.gitkeep

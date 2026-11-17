@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, Clock, Sparkles, CheckCircle2, AlertCircle, Loader2, ArrowRight } from "lucide-react";
+import { X, Clock, Sparkles, CheckCircle2, AlertCircle, Loader2, ArrowRight, Download } from "lucide-react";
 import { VideoTaskResponse } from "@/lib/types";
 
 interface RecentGalleryProps {
@@ -128,9 +128,24 @@ export function RecentGallery({
                     &quot;{t.userPrompt}&quot;
                   </p>
 
-                  <div className="flex items-center justify-between text-[11px] text-purple-700 font-bold pt-1 border-t border-slate-100">
-                    <span>انقر للعرض</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
+                  <div className="flex items-center justify-between text-[11px] font-bold pt-1.5 border-t border-slate-100">
+                    <span className="text-purple-700 flex items-center gap-1">
+                      <span>انقر للعرض</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </span>
+
+                    {t.resultFileUrl && (
+                      <a
+                        href={`/api/download?taskId=${t.id}`}
+                        download={`kidtales-animated-${t.id.slice(-6)}.mp4`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-all text-[11px] font-bold"
+                        title="تحميل ملف الفيديو مباشرة"
+                      >
+                        <Download className="w-3 h-3 text-emerald-600" />
+                        <span>تحميل MP4</span>
+                      </a>
+                    )}
                   </div>
                 </div>
               );

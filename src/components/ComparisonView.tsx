@@ -28,8 +28,35 @@ export function ComparisonView({ task, onReset }: ComparisonViewProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isLooping, setIsLooping] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  const downloadApiUrl = `/api/download?taskId=${task.id}`;
+
+  const handleDownloadVideo = async () => {
+    if (!task.resultFileUrl) return;
+    setIsDownloading(true);
+    try {
+      const response = await fetch(downloadApiUrl);
+      if (!response.ok) throw new Error("Failed to fetch video blob");
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const tempLink = document.createElement("a");
+      tempLink.style.display = "none";
+      tempLink.href = blobUrl;
+      tempLink.download = `kidtales-animated-${task.id.slice(-6)}.mp4`;
+      document.body.appendChild(tempLink);
+      tempLink.click();
+      document.body.removeChild(tempLink);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+    } catch (err) {
+      console.warn("Direct blob download failed, falling back to direct navigation:", err);
+      window.location.href = downloadApiUrl;
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   // Trigger cheerful confetti explosion upon completion!
   useEffect(() => {
@@ -253,16 +280,39 @@ export function ComparisonView({ task, onReset }: ComparisonViewProps) {
 
       {/* Control Actions Bottom Bar */}
       <div className="pt-4 flex flex-wrap items-center justify-between gap-4 border-t border-purple-100">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {task.resultFileUrl && (
-            <a
-              href={task.resultFileUrl}
-              download="animated-story-video.mp4"
-              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-sm shadow-lg shadow-emerald-200 hover:brightness-105 active:scale-95 transition-all"
-            >
-              <Download className="w-4 h-4" />
-              <span>تحميل الفيديو (MP4)</span>
-            </a>
+            <>
+              <button
+                type="button"
+                onClick={handleDownloadVideo}
+                disabled={isDownloading}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-black text-sm shadow-lg shadow-emerald-200 hover:brightness-105 active:scale-95 transition-all disabled:opacity-70 cursor-pointer"
+                title="تحميل مباشر إلى جهازك"
+              >
+                {isDownloading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>جاري التجهيز والتحميل...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>تحميل الفيديو (MP4)</span>
+                  </>
+                )}
+              </button>
+
+              <a
+                href={downloadApiUrl}
+                download={`kidtales-animated-${task.id.slice(-6)}.mp4`}
+                className="inline-flex items-center gap-1 px-4 py-3 rounded-2xl border border-emerald-300 text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100 hover:text-emerald-800 transition-all text-xs font-bold"
+                title="رابط تحميل إضافي مباشر"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>رابط مباشر</span>
+              </a>
+            </>
           )}
 
           <button
